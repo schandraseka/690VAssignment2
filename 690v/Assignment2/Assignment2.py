@@ -1,3 +1,8 @@
+__author__ = "Siddharth Chandrasekaran"
+__license__ = "GPL"
+__version__ = "1.0.1"
+__email__ = "schandraseka@umass.edu"
+
 from bokeh.core.properties import field
 from bokeh.io import curdoc
 from bokeh.layouts import layout
@@ -23,15 +28,11 @@ from bokeh.models.widgets import Button, RadioButtonGroup, Select, Slider
 from functools import partial
 from bokeh.models.widgets import DataTable
 from bokeh.models.glyphs import HBar
-
-
-#Section 1 Visualizing the data
+#Section -1 Visualizing the data
 original_data = pd.read_csv("Wholesalecustomersdata.csv")
 missing_data = pd.read_csv("Wholesalecustomersdatamissing.csv")
 original_data.Channel = original_data.Channel.astype(str)
 original_data.Region = original_data.Region.astype(str)
-
-#Initially weselect one value. This later gets controlled by the select button
 selected = 'Milk'
 selected_data = original_data
 selected_data['Data'] = selected_data[selected]
@@ -39,17 +40,19 @@ group = selected_data.groupby(('Channel','Region'))
 source = ColumnDataSource(group)
 
 index_cmap = factor_cmap('Channel_Region', palette=Spectral6, factors=sorted(original_data.Region.unique()), end=1)
-p1 = figure(plot_width=300, plot_height=300, title="Milk mean orders V/S Channel-Region",
+p1 = figure(plot_width=700, plot_height=300, title="Milk mean order value V/S Channel-Region",
            x_range=group)
-p1.vbar(x='Channel_Region', top='Data_mean', width=1, source=source,
+p1.vbar(x='Channel_Region', top='Data_mean', width=0.5, source=source,
        line_color="white", fill_color=index_cmap, )
 
 p1.add_tools(HoverTool(tooltips=[("Mean Order Quantity", "@Data_mean"), ("Channel, Region", "@Channel_Region")]))
 
+p1.xaxis.axis_label = "Channel,Region"
+p1.yaxis.axis_label = "Mean of the order value of a Product"
 
 def sourcemodify(attr, old, new, foo):
 	val = select.value
-	p1.title.text = select.value + " mean orders V/S Channel-Region"
+	p1.title.text = select.value + " mean order value V/S Channel-Region"
 	foo['Data'] = foo[val]
 	group = foo.groupby(('Channel','Region'))
 	source.data = ColumnDataSource(group).data
@@ -146,26 +149,39 @@ cols = ['Milk', 'Grocery1', 'Grocery2','Detergents_Paper1','Detergents_Paper2','
 data = {}
 data['cols'] = cols
 data['org'] = orglist
-data['meth1'] = meth1list
-data['meth2'] = meth2list
-data['meth3'] = meth3list
-data['meth4'] = meth4list
+data['Method 1 (GC)'] = meth1list
+data['Method 2 (Mean)'] = meth2list
+data['Method 3 (KNN)'] = meth3list
+data['Method 4 (LR)'] = meth4list
 
 techs = ['org', 'meth1', 'meth2', 'meth3', 'meth4']
 
+#Initializing it for method 1. This gets controlled by the drop box selector
+source1 = ColumnDataSource(dict(y=cols, right=orglist, compare = meth1list))
 
-source = ColumnDataSource(dict(y=cols, right=orglist,))
+
+p2 = figure(plot_width=700, plot_height=300, title="Estimated Values of Method 1 (GC) Vs Predicted Value Bar Chart",
+           y_range=cols, x_range = (-2,10000))
+glyph = HBar(y="y", right="right", left=0, height=0.5, fill_color="#99d594", fill_alpha = 0.6)
+p2.add_glyph(source1, glyph)
+
+glyph1 = HBar(y="y", right="compare", left=0, height=0.5, fill_color="#d53e4f", fill_alpha = 0.6)
+p2.add_glyph(source1, glyph1)
+p2.xaxis.axis_label = "Money Spent"
+p2.yaxis.axis_label = "Missing value's Product"
 
 
-p2 = figure(plot_width=500, plot_height=300, title="Estimated Values Vs Predicted Value Bar Chart",
-           y_range=cols, x_range = (1,10000))
-glyph = HBar(y="y", right="right", left=0, height=0.5, fill_color="#b3de69")
-p2.add_glyph(source, glyph)
-show(p2)
+def source1modify(attr, old, new, foo):
+	val = select1.value
+	p2.title.text = "Estimated Values of " +select1.value + " Vs Predicted Value Bar Chart"
+	source1.data = ColumnDataSource(dict(y=cols, right=orglist, compare = foo[select1.value])).data
+
+select1 = Select(title="Product:", value=selected, options=["Method 1 (GC)", "Method 2 (Mean)", "Method 3 (KNN)", "Method 4 (LR)"])
+select1.on_change('value',partial(source1modify, foo=data)) 
 
 layout = layout([
-    [p1],
-    [select],
+    [p1,select],
+    [p2,select1]
 ])
 curdoc().add_root(layout)
 curdoc().title = "690V Assignment - Whole Customer Dataset"
